@@ -57,7 +57,6 @@ public class SbtService {
     public SbtItem searchSBT (AlgoItem item) {
         try {
             final ValueOperations<String, SbtItem> operations = redisTemplate.opsForValue();
-
             final boolean hasKey = redisTemplate.hasKey(item.getAssetId());
             System.out.println(hasKey);
             if (hasKey) {
@@ -74,7 +73,6 @@ public class SbtService {
                 operations.set(sbtItem.getAssetId(),sbtItem);
                 return sbtItem;
             }
-
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
