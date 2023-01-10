@@ -11,9 +11,13 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class SbtService {
+
     @Autowired
     private SbtRepository sbtRepository;
+    @Autowired
+    private RedisTemplate<String,SbtItem> redisTemplate;
     private SBTManager sbtManager;
 
     public String mintSBT() throws Exception {
@@ -52,8 +56,25 @@ public class SbtService {
     }
     public SbtItem searchSBT (AlgoItem item) {
         try {
-            SbtItem sbtItem = sbtRepository.findByAddressAndAssetId(item.getAddress(),item.getAssetId());
-            return sbtItem;
+            final ValueOperations<String, SbtItem> operations = redisTemplate.opsForValue();
+
+            final boolean hasKey = redisTemplate.hasKey(item.getAssetId());
+            System.out.println(hasKey);
+            if (hasKey) {
+                long startTime = System.currentTimeMillis();
+                SbtItem sbtItem = operations.get(item.getAssetId());
+                long endTime = System.currentTimeMillis();
+                System.out.println("cache：" + (endTime - startTime) + "ms");
+                return sbtItem;
+            } else {
+                long startTime = System.currentTimeMillis();
+                SbtItem sbtItem = sbtRepository.findByAddressAndAssetId(item.getAddress(),item.getAssetId());
+                long endTime = System.currentTimeMillis();
+                System.out.println("database：" + (endTime - startTime) + "ms");
+                operations.set(sbtItem.getAssetId(),sbtItem);
+                return sbtItem;
+            }
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
