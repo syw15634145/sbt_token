@@ -8,7 +8,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +24,7 @@ public class SbtService {
     @Autowired
     private RedisTemplate<String,SbtItem> redisTemplate;
     private SBTManager sbtManager;
-
+    private Lock lock = new ReentrantLock();
     public String mintSBT() throws Exception {
         String assetId = sbtManager.mintSBT();
         SbtItem sbtItem = new SbtItem();
@@ -54,24 +59,30 @@ public class SbtService {
             throw new RuntimeException(e);
         }
     }
-    public SbtItem searchSBT (AlgoItem item) {
+    @Async("asyncTaskExecutor")
+    public CompletableFuture<SbtItem> searchSBT (AlgoItem item) {
         try {
+            lock.lock();
+            CompletableFuture<SbtItem> task = new CompletableFuture<>();
             final ValueOperations<String, SbtItem> operations = redisTemplate.opsForValue();
-            final boolean hasKey = redisTemplate.hasKey(item.getAssetId());
-            System.out.println(hasKey);
+            boolean hasKey = redisTemplate.hasKey(item.getAssetId());
             if (hasKey) {
                 long startTime = System.currentTimeMillis();
                 SbtItem sbtItem = operations.get(item.getAssetId());
                 long endTime = System.currentTimeMillis();
                 System.out.println("cache：" + (endTime - startTime) + "ms");
-                return sbtItem;
+                task.complete(sbtItem);
+                lock.unlock();
+                return task;
             } else {
                 long startTime = System.currentTimeMillis();
                 SbtItem sbtItem = sbtRepository.findByAddressAndAssetId(item.getAddress(),item.getAssetId());
                 long endTime = System.currentTimeMillis();
                 System.out.println("database：" + (endTime - startTime) + "ms");
                 operations.set(sbtItem.getAssetId(),sbtItem);
-                return sbtItem;
+                task.complete(sbtItem);
+                lock.unlock();
+                return task;
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

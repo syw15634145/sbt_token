@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.GeneralSecurityException;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 public class FirstController {
@@ -58,9 +59,9 @@ public class FirstController {
     @PostMapping(path = "/search")
     public ResponseEntity searchSBT (@RequestBody AlgoItem item) {
         try {
-            SbtItem sbtItem = sbtService.searchSBT(item);
-            if (sbtItem != null) {
-                return ResponseEntity.ok(sbtItem.toString());
+            CompletableFuture<SbtItem> task = sbtService.searchSBT(item);
+            if (task.get() != null) {
+                return ResponseEntity.ok(task.get().toString());
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
